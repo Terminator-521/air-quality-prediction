@@ -1,9 +1,12 @@
 """
 data_prep_india.py
 -------------------
-Loads and cleans the India city-level air quality dataset (26 cities,
-daily readings, 2015-2020 -- the well-known "Air Quality Data in India"
-dataset originally published on Kaggle by Rohan Rao / CPCB station data).
+Loads and cleans the India air quality data:
+  * city_day.csv  -- 26 cities, daily pollutants + AQI, 2015-2020 (CPCB station data,
+    the well-known Kaggle "Air Quality Data in India" set). Trains the model.
+  * aqi_daily_2022_2025.csv.gz -- 292 places across 32 states/UTs, daily AQI only,
+    Apr 2022 - Apr 2025 (Kaggle India AQI dataset; see prepare_new_data.py).
+    Used for history, crop-burning analysis and the assistant.
 
 Adds two things the Italy dataset didn't need:
   1. A location/city search helper, since this dataset covers 26 cities.
@@ -20,6 +23,8 @@ import numpy as np
 import pandas as pd
 
 RAW_PATH = "data/city_day.csv"
+NEW_PATH = "data/aqi_daily_2022_2025.csv.gz"
+PLACES_PATH = "data/places.csv"
 
 # Approximate city-center coordinates for the 26 cities in the dataset.
 # Used only to place a marker on the dashboard map -- not part of the
@@ -89,6 +94,79 @@ def load_and_clean(path: str = RAW_PATH) -> pd.DataFrame:
     )
 
     return df.reset_index(drop=True)
+
+
+# State for each of the 26 original cities (the old CSV has no state column).
+OLD_CITY_STATE = {
+    "Ahmedabad": "Gujarat", "Aizawl": "Mizoram", "Amaravati": "Andhra Pradesh",
+    "Amritsar": "Punjab", "Bengaluru": "Karnataka", "Bhopal": "Madhya Pradesh",
+    "Brajrajnagar": "Odisha", "Chandigarh": "Chandigarh", "Chennai": "Tamil Nadu",
+    "Coimbatore": "Tamil Nadu", "Delhi": "Delhi", "Ernakulam": "Kerala",
+    "Gurugram": "Haryana", "Guwahati": "Assam", "Hyderabad": "Telangana",
+    "Jaipur": "Rajasthan", "Jorapokhar": "Jharkhand", "Kochi": "Kerala",
+    "Kolkata": "West Bengal", "Lucknow": "Uttar Pradesh", "Mumbai": "Maharashtra",
+    "Patna": "Bihar", "Shillong": "Meghalaya", "Talcher": "Odisha",
+    "Thiruvananthapuram": "Kerala", "Visakhapatnam": "Andhra Pradesh",
+}
+
+
+def _add_calendar(df):
+    df["month"] = df["Date"].dt.month
+    df["day"] = df["Date"].dt.day
+    df["year"] = df["Date"].dt.year
+    df["is_crop_burning_season"] = (
+        ((df["month"] == 10) & (df["day"] >= 15)) | (df["month"] == 11)
+    )
+    return df
+
+
+def load_new_data(path: str = NEW_PATH) -> pd.DataFrame:
+    """Kaggle India AQI 2022-2025: daily AQI per place (no pollutant concentrations)."""
+    d = pd.read_csv(path, parse_dates=["date"])
+    d = d.rename(columns={"place": "City", "state": "State", "date": "Date", "aqi": "AQI"})
+    d["AQI_Bucket"] = d["AQI"].apply(_aqi_to_bucket)  # CPCB breakpoints, same as the old data
+    d["source"] = "2022-2025"
+    return _add_calendar(d)
+
+
+def load_history(old_path: str = RAW_PATH, new_path: str = NEW_PATH) -> pd.DataFrame:
+    """
+    Both datasets stacked into one daily-AQI history (columns: City, State, Date,
+    AQI, AQI_Bucket, source, dominant_pollutants, stations + calendar flags).
+    Used for the history/crop-burning views and the assistant. The pollutant
+    model is still trained on the old data only (the new file has no pollutants).
+    There is a gap between Jul 2020 and Mar 2022 where neither file has data.
+    """
+    old = load_and_clean(old_path)[["City", "Date", "AQI", "AQI_Bucket"]].copy()
+    old["State"] = old["City"].map(OLD_CITY_STATE)
+    old["source"] = "2015-2020"
+    old["dominant_pollutants"] = None
+    old["stations"] = pd.NA
+    old = _add_calendar(old)
+    new = load_new_data(new_path)
+    cols = ["City", "State", "Date", "AQI", "AQI_Bucket", "source",
+            "dominant_pollutants", "stations", "month", "day", "year", "is_crop_burning_season"]
+    df = pd.concat([old[cols], new[cols]], ignore_index=True)
+    return df.sort_values(["City", "Date"]).reset_index(drop=True)
+
+
+def load_places(path: str = PLACES_PATH) -> pd.DataFrame:
+    """place -> state, latitude, longitude (coordinates may be missing)."""
+    p = pd.read_csv(path).rename(columns={"place": "City", "state": "State"})
+    old = pd.DataFrame(
+        [{"City": c, "State": OLD_CITY_STATE[c], "latitude": lat, "longitude": lon,
+          "coord_source": "hardcoded"} for c, (lat, lon) in CITY_COORDS.items()])
+    # the 26 original hand-set coordinates win over GeoNames for those cities
+    p = p[~p["City"].isin(old["City"])]
+    return pd.concat([old, p], ignore_index=True).sort_values("City").reset_index(drop=True)
+
+
+def place_coords(places, city):
+    """(lat, lon) for a city, or None if we have no coordinate for it."""
+    row = places[places["City"] == city]
+    if row.empty or pd.isna(row.iloc[0]["latitude"]):
+        return None
+    return float(row.iloc[0]["latitude"]), float(row.iloc[0]["longitude"])
 
 
 def _aqi_to_bucket(aqi: float) -> str:

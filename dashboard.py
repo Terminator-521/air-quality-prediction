@@ -6,11 +6,11 @@ Streamlit dashboard for the Air Quality Prediction project.
 Run with:
     streamlit run dashboard.py
 
-Three tabs:
+Four tabs:
   1. Live Air Quality & Forecast -- search ANY place on Earth (via
      Open-Meteo's free geocoding API), pull its live + 4-day-forecast
      pollutant readings (via Open-Meteo's free air-quality API), and run
-     them through our own Random Forest model (trained on 5 years of
+     them through our own Random Forest model (trained on
      Indian CPCB station data) to get a predicted Indian-style AQI value
      and category for right now AND for the next few days. Open-Meteo
      gives raw pollutant forecasts but only computes US/European AQI --
@@ -18,8 +18,12 @@ Three tabs:
   2. Crop Burning Season Impact -- how much the Oct 15-Nov 30 stubble
      burning window pushes up AQI in North Indian cities, from the
      historical dataset.
-  3. City History Explorer -- browse the historical (2015-2020) daily
-     AQI record for any of the 26 Indian cities in the training data.
+  3. City History Explorer -- browse the daily AQI record (2015-2020 and
+     2022-2025) for any of 292 Indian places, filterable by state.
+  4. AQI Assistant -- chat with an LLM (Claude) that answers questions by
+     calling this project's own tools: live AQI, forecast, city history,
+     city comparison, crop-burning impact and CPCB-based health guidance.
+     Needs an Anthropic API key (entered in the sidebar).
 """
 
 import joblib
@@ -27,8 +31,15 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from data_prep_india import load_and_clean, CITY_COORDS, CROP_BURNING_HOTSPOT_CITIES, search_city
+from data_prep_india import (
+    load_history, load_places, place_coords, CROP_BURNING_HOTSPOT_CITIES, search_city,
+)
 from live_data import geocode, fetch_air_quality, add_predictions, LiveDataError
+from assistant_tools import AirQualityTools
+from assistant import (
+    MODELS, DEFAULT_MODEL_LABEL, SAMPLE_QUESTIONS,
+    get_api_key, make_client, run_assistant, friendly_error,
+)
 
 st.set_page_config(page_title="Air Quality Predictor", page_icon="🌍", layout="wide")
 
@@ -92,7 +103,30 @@ def load_models():
 
 @st.cache_data
 def load_historical():
-    return load_and_clean()
+    return load_history()
+
+@st.cache_data
+def load_place_table():
+    return load_places()
+
+
+def with_gaps(df, days=45):
+    """Insert a blank row wherever the data jumps by more than `days`, so charts
+    show the Jul 2020 - Mar 2022 gap as a break instead of a misleading line."""
+    df = df.sort_values("Date").reset_index(drop=True)
+    gaps = df.index[df["Date"].diff().dt.days > days]
+    if len(gaps) == 0:
+        return df
+    blanks = pd.DataFrame({"Date": df.loc[gaps, "Date"] - pd.Timedelta(days=1), "AQI": float("nan")})
+    return pd.concat([df, blanks], ignore_index=True).sort_values("Date")
+
+
+def shade_seasons(fig, dates):
+    for year in sorted(dates.dt.year.unique()):
+        fig.add_vrect(
+            x0=pd.Timestamp(year=year, month=10, day=15), x1=pd.Timestamp(year=year, month=11, day=30),
+            fillcolor="#E53935", opacity=0.15, line_width=0,
+        )
 
 @st.cache_data(ttl=900)
 def cached_geocode(query):
@@ -105,20 +139,48 @@ def cached_air_quality(lat, lon):
 
 clf_model, reg_model, FEATURES = load_models()
 hist_df = load_historical()
+places_df = load_place_table()
 HIST_CITIES = sorted(hist_df["City"].unique())
+HIST_STATES = sorted(hist_df["State"].dropna().unique())
+
+
+@st.cache_resource
+def load_assistant_tools():
+    return AirQualityTools(clf_model, reg_model, FEATURES, hist_df)
+
+
+assistant_tools = load_assistant_tools()
+st.session_state.setdefault("chat_history", [])   # plain text turns sent to the LLM
+st.session_state.setdefault("chat_display", [])   # what the chat UI shows (+ tool traces)
+
+# ---------------------------------------------------------------- sidebar: assistant settings
+with st.sidebar:
+    st.header("🤖 Assistant settings")
+    key_input = st.text_input(
+        "Anthropic API key", type="password", placeholder="sk-ant-...",
+        help="Only used by the AQI Assistant tab. Kept in this browser session; never saved to disk.",
+    )
+    model_label = st.selectbox(
+        "Model", list(MODELS), index=list(MODELS).index(DEFAULT_MODEL_LABEL),
+    )
+    api_key = get_api_key(key_input)
+    if api_key and not key_input:
+        st.caption("Using the key from ANTHROPIC_API_KEY / Streamlit secrets.")
+    st.caption("Get a key at console.anthropic.com. The other three tabs need no key.")
 
 st.markdown("""
 <div class="hero">
   <h1>🌍 Air Quality Prediction &amp; Monitoring</h1>
   <p>Live global air quality (Open-Meteo — free, no API key) scored by an ML model trained on
-     5 years of Indian CPCB station data</p>
+     Indian CPCB station data, with daily AQI history for 292 places across India (2015–2025)</p>
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "🌍 Live Air Quality & Forecast",
     "🔥 Crop Burning Season Impact",
     "📈 City History Explorer",
+    "🤖 AQI Assistant",
 ])
 
 # ================================================================== TAB 1
@@ -129,14 +191,26 @@ with tab1:
         placeholder="e.g. Delhi, Paris, New York, Nairobi, Tokyo",
     )
 
-    if not query:
-        st.info("Type a place name above to fetch its live air quality and a 4-day forecast.")
+    pick_options = ["—"] + [c for c in HIST_CITIES if place_coords(places_df, c)]
+    picked = st.selectbox(
+        "…or pick one of the 292 Indian places we have history for", pick_options, key="live_pick",
+        help="Uses saved coordinates, so no location search is needed.",
+    )
+
+    if not query and picked == "—":
+        st.info("Type a place name above (or pick an Indian place) to fetch its live air quality and a 4-day forecast.")
     else:
         matches, geo_error = [], None
-        try:
-            matches = cached_geocode(query)
-        except LiveDataError as e:
-            geo_error = str(e)
+        if query:
+            try:
+                matches = cached_geocode(query)
+            except LiveDataError as e:
+                geo_error = str(e)
+        else:
+            lat0, lon0 = place_coords(places_df, picked)
+            st_name = places_df.loc[places_df["City"] == picked, "State"].iloc[0]
+            matches = [{"name": picked, "admin1": st_name, "country": "India",
+                        "latitude": lat0, "longitude": lon0}]
 
         if geo_error:
             st.error(geo_error)
@@ -179,6 +253,19 @@ with tab1:
                 c3.markdown(metric_card("PM2.5", f"{current['PM2.5']:.0f} µg/m³"), unsafe_allow_html=True)
                 c4.markdown(metric_card("PM10", f"{current['PM10']:.0f} µg/m³"), unsafe_allow_html=True)
 
+                hist_match = place["name"] if place["name"] in HIST_CITIES else None
+                if hist_match is None and place["country"] == "India":
+                    hits = [c for c in HIST_CITIES if c.lower() == place["name"].lower()
+                            or c.lower().startswith(place["name"].lower() + " (")]
+                    hist_match = hits[0] if len(hits) == 1 else None
+                if hist_match:
+                    hd = hist_df[hist_df["City"] == hist_match]
+                    st.caption(
+                        f"📚 Historical context for {hist_match}: average AQI **{hd['AQI'].mean():.0f}** over "
+                        f"{len(hd):,} days on record; **{(hd['AQI'] > 200).mean() * 100:.0f}%** of days were "
+                        f"Poor or worse. See the History Explorer tab for more."
+                    )
+
                 st.write("")
                 n_forecast_days = forecast["time"].dt.date.nunique() if len(forecast) else 0
                 st.subheader(f"{place['name']}: recent actuals + {n_forecast_days}-day forecast")
@@ -204,7 +291,7 @@ with tab1:
                 st.caption(
                     "Pollutant concentrations (PM2.5, PM10, CO, NO2, SO2, O3) come live from Open-Meteo's "
                     "global air-quality model. The AQI value and category shown are **our own** model's "
-                    "prediction, trained on 5 years of Indian CPCB station data — not Open-Meteo's native "
+                    "prediction, trained on Indian CPCB station data — not Open-Meteo's native "
                     "AQI, which is computed on the US/European scale."
                 )
 
@@ -231,11 +318,15 @@ with tab2:
         "North India, and is one of the biggest documented drivers of the annual "
         "air-quality crisis in Delhi-NCR and nearby cities."
     )
+    st.caption(
+        "Data: daily AQI from 2015-2020 (26 cities) and 2022-2025 (292 places). "
+        "Season windows covered: 2015-2019 (few cities in the early years) and 2022-2024 (most places)."
+    )
 
     hotspot_present = [c for c in CROP_BURNING_HOTSPOT_CITIES if c in HIST_CITIES]
     season_df = hist_df.copy()
     season_df["group"] = season_df["City"].apply(
-        lambda c: c if c in hotspot_present else "Other cities"
+        lambda c: c if c in hotspot_present else "Other places"
     )
     summary = (
         season_df.groupby(["group", "is_crop_burning_season"])["AQI"]
@@ -244,7 +335,7 @@ with tab2:
         .rename(columns={False: "Rest of year", True: "Crop-burning season"})
     )
     summary["Increase"] = summary["Crop-burning season"] - summary["Rest of year"]
-    summary = summary.loc[hotspot_present + ["Other cities"]]
+    summary = summary.loc[hotspot_present + ["Other places"]]
 
     c1, c2 = st.columns([1, 1])
     with c1:
@@ -256,43 +347,76 @@ with tab2:
         fig.update_layout(barmode="group", template="plotly_white", height=350, margin=dict(t=10, l=10, r=10, b=10))
         st.plotly_chart(fig, width='stretch')
 
-    st.subheader("Delhi: full daily AQI history, crop-burning windows shaded")
-    delhi = hist_df[hist_df["City"] == "Delhi"].sort_values("Date")
+    st.subheader("Season by season: average AQI in the burning window")
+    season_years = sorted(hist_df.loc[hist_df["is_crop_burning_season"], "year"].unique())
+    yr = (
+        hist_df[hist_df["is_crop_burning_season"] & hist_df["City"].isin(hotspot_present)]
+        .groupby(["City", "year"])["AQI"].mean().unstack().reindex(hotspot_present)
+    )
+    fig_y = go.Figure()
+    for y in season_years:
+        if y in yr.columns:
+            fig_y.add_trace(go.Bar(name=str(y), x=yr.index, y=yr[y]))
+    fig_y.update_layout(barmode="group", template="plotly_white", height=330,
+                        yaxis_title="Avg AQI, 15 Oct - 30 Nov", margin=dict(t=10, l=10, r=10, b=10))
+    st.plotly_chart(fig_y, width='stretch')
+
+    st.subheader("Which states are hit hardest?")
+    by_state = (
+        hist_df[hist_df["year"] >= 2022].groupby(["State", "is_crop_burning_season"])["AQI"].mean().unstack()
+        .rename(columns={False: "Rest of year", True: "Crop-burning season"}).dropna()
+    )
+    by_state = by_state.sort_values("Crop-burning season", ascending=False).head(12)
+    fig_s = go.Figure()
+    fig_s.add_trace(go.Bar(name="Rest of year", x=by_state.index, y=by_state["Rest of year"], marker_color="#2a5298"))
+    fig_s.add_trace(go.Bar(name="Crop-burning season", x=by_state.index, y=by_state["Crop-burning season"], marker_color="#E53935"))
+    fig_s.update_layout(barmode="group", template="plotly_white", height=360,
+                        margin=dict(t=10, l=10, r=10, b=10))
+    st.plotly_chart(fig_s, width='stretch')
+    st.caption("2022-2025 data only, averaged over all places in each state (top 12 states by season AQI).")
+
+    st.subheader("Delhi: daily AQI history, crop-burning windows shaded")
+    delhi = with_gaps(hist_df[hist_df["City"] == "Delhi"][["Date", "AQI"]])
     fig2 = go.Figure()
     fig2.add_trace(go.Scatter(x=delhi["Date"], y=delhi["AQI"], mode="lines", line=dict(color="#2a5298", width=1)))
-    for year in delhi["Date"].dt.year.unique():
-        fig2.add_vrect(
-            x0=pd.Timestamp(year=year, month=10, day=15), x1=pd.Timestamp(year=year, month=11, day=30),
-            fillcolor="#E53935", opacity=0.15, line_width=0,
-        )
+    shade_seasons(fig2, delhi["Date"])
     fig2.update_layout(template="plotly_white", height=380, yaxis_title="AQI", margin=dict(t=10, l=10, r=10, b=10))
-    st.plotly_chart(fig2, width='stretch')
+    st.plotly_chart(fig2, width='stretch', key='delhi_chart')
+    st.caption("The break between mid-2020 and early 2022 is real: neither dataset covers it.")
 
-    st.subheader("Top 10 most-affected cities during crop-burning season")
-    season_avg = (
-        hist_df[hist_df["is_crop_burning_season"]]
-        .groupby("City")["AQI"].mean().sort_values(ascending=False).head(10)
-    )
+    st.subheader("Top 10 most-affected places during crop-burning season")
+    seas = hist_df[hist_df["is_crop_burning_season"]]
+    n_days = seas.groupby("City")["AQI"].count()
+    seas = seas[seas["City"].isin(n_days[n_days >= 30].index)]
+    season_avg = seas.groupby("City")["AQI"].mean().sort_values(ascending=False).head(10)
     fig3 = go.Figure(go.Bar(x=season_avg.values, y=season_avg.index, orientation="h", marker_color="#FB8C00"))
     fig3.update_layout(template="plotly_white", height=380, xaxis_title="Average AQI (mid-Oct to end-Nov)",
                         margin=dict(t=10, l=10, r=10, b=10), yaxis=dict(autorange="reversed"))
     st.plotly_chart(fig3, width='stretch')
+    st.caption("Places with fewer than 30 in-season days on record are left out.")
 
 # ================================================================== TAB 3
 with tab3:
-    st.subheader("Browse historical data (2015-2020) for any of the 26 tracked cities")
-    hquery = st.text_input("Type a city name", "", key="hist_search")
-    hmatches = search_city(hquery, HIST_CITIES) if hquery else HIST_CITIES
+    st.subheader(f"Browse daily AQI history for {len(HIST_CITIES)} Indian places (2015-2025)")
+    f1, f2 = st.columns([1, 2])
+    state_sel = f1.selectbox("State / UT", ["All states"] + HIST_STATES, key="hist_state")
+    hquery = f2.text_input("Type a place name", "", key="hist_search")
+    pool = (HIST_CITIES if state_sel == "All states" else
+            sorted(hist_df.loc[hist_df["State"] == state_sel, "City"].unique()))
+    hmatches = search_city(hquery, pool) if hquery else pool
 
     if not hmatches:
-        st.warning(f"No city matching '{hquery}'.")
+        st.warning(f"No place matching '{hquery}'" + ("" if state_sel == "All states" else f" in {state_sel}") + ".")
     else:
-        city = st.selectbox("City", hmatches, key="hist_city")
+        default_idx = hmatches.index("Delhi") if "Delhi" in hmatches else 0
+        city = st.selectbox(f"Place ({len(hmatches)} available)", hmatches, index=default_idx, key="hist_city")
         city_df = hist_df[hist_df["City"] == city].sort_values("Date")
 
-        if city in CITY_COORDS:
-            lat, lon = CITY_COORDS[city]
-            st.map(pd.DataFrame([{"lat": lat, "lon": lon}]), zoom=9)
+        coords = place_coords(places_df, city)
+        if coords:
+            st.map(pd.DataFrame([{"lat": coords[0], "lon": coords[1]}]), zoom=9)
+        else:
+            st.caption("No map coordinate is available for this place.")
 
         latest = city_df.iloc[-1]
         c1, c2, c3 = st.columns(3)
@@ -300,22 +424,124 @@ with tab3:
         c2.markdown(metric_card("Average AQI (all years)", f"{city_df['AQI'].mean():.0f}"), unsafe_allow_html=True)
         in_season = city_df[city_df["is_crop_burning_season"]]["AQI"].mean()
         out_season = city_df[~city_df["is_crop_burning_season"]]["AQI"].mean()
-        c3.markdown(
-            metric_card("Crop-burning season AQI", f"{in_season:.0f}", f"{in_season - out_season:+.0f} vs rest of year"),
-            unsafe_allow_html=True,
+        if pd.notna(in_season) and pd.notna(out_season):
+            c3.markdown(
+                metric_card("Crop-burning season AQI", f"{in_season:.0f}", f"{in_season - out_season:+.0f} vs rest of year"),
+                unsafe_allow_html=True,
+            )
+        else:
+            c3.markdown(metric_card("Crop-burning season AQI", "n/a", "no in-season days on record"), unsafe_allow_html=True)
+        st.caption(
+            f"{city_df['State'].iloc[0]} · {len(city_df):,} days on record "
+            f"({city_df['Date'].min().date()} to {city_df['Date'].max().date()})"
         )
 
         st.write("")
         st.subheader(f"{city}: daily AQI history (crop-burning windows shaded)")
+        plot_df = with_gaps(city_df[["Date", "AQI"]])
         fig4 = go.Figure()
-        fig4.add_trace(go.Scatter(x=city_df["Date"], y=city_df["AQI"], mode="lines", line=dict(color="#2a5298", width=1)))
-        for year in city_df["Date"].dt.year.unique():
-            fig4.add_vrect(
-                x0=pd.Timestamp(year=year, month=10, day=15), x1=pd.Timestamp(year=year, month=11, day=30),
-                fillcolor="#E53935", opacity=0.15, line_width=0,
-            )
+        fig4.add_trace(go.Scatter(x=plot_df["Date"], y=plot_df["AQI"], mode="lines", line=dict(color="#2a5298", width=1)))
+        shade_seasons(fig4, city_df["Date"])
         fig4.update_layout(template="plotly_white", height=380, yaxis_title="AQI", margin=dict(t=10, l=10, r=10, b=10))
-        st.plotly_chart(fig4, width='stretch')
+        st.plotly_chart(fig4, width='stretch', key='hist_chart')
+
+        dom = city_df["dominant_pollutants"].dropna()
+        if len(dom):
+            st.subheader("Which pollutant drives the AQI most often?")
+            dcount = dom.value_counts().head(6)
+            fig5 = go.Figure(go.Bar(x=dcount.index, y=dcount.values / len(dom) * 100, marker_color="#6A1B9A"))
+            fig5.update_layout(template="plotly_white", height=280, yaxis_title="% of days (2022-2025)",
+                               margin=dict(t=10, l=10, r=10, b=10))
+            st.plotly_chart(fig5, width='stretch', key='dom_chart')
+            st.caption("The pollutant with the highest sub-index each day; only the 2022-2025 file lists it.")
 
         st.subheader("Raw data sample")
-        st.dataframe(city_df.tail(200), width='stretch')
+        st.dataframe(
+            city_df[["Date", "City", "State", "AQI", "AQI_Bucket", "dominant_pollutants", "stations", "source"]].tail(200),
+            width='stretch',
+        )
+
+# ================================================================== TAB 4
+def render_trace(trace):
+    """Show which tools the assistant called (and what they returned)."""
+    n = len(trace)
+    with st.expander(f"🔧 {n} tool call{'s' if n != 1 else ''} used"):
+        for t in trace:
+            args = ", ".join(f"{k}={v!r}" for k, v in t["input"].items())
+            st.markdown(f"**{t['tool']}**({args})")
+            st.json(t["output"], expanded=False)
+
+
+with tab4:
+    st.subheader("🤖 AQI Assistant")
+    st.caption(
+        "Ask in plain English. This is an LLM that answers by calling the project's own tools "
+        "(live AQI, forecast, city history, crop-burning impact, health guidance), so its numbers "
+        "come from real data, not from memory. Expand '🔧 tool calls' under any answer to see exactly what it used."
+    )
+
+    if not api_key:
+        st.info("Add your Anthropic API key in the sidebar to start chatting. The other tabs work without one.")
+
+    st.write("**Try asking:**")
+    sample_cols = st.columns(2)
+    clicked = None
+    for i, q in enumerate(SAMPLE_QUESTIONS):
+        if sample_cols[i % 2].button(q, key=f"sample_{i}"):
+            clicked = q
+
+    if st.session_state.chat_display and st.button("🗑️ Clear chat"):
+        st.session_state.chat_history = []
+        st.session_state.chat_display = []
+        st.rerun()
+
+    for m in st.session_state.chat_display:
+        with st.chat_message(m["role"]):
+            level = m.get("level")
+            if level == "error":
+                st.error(m["text"])
+            elif level == "warning":
+                st.warning(m["text"])
+            else:
+                st.markdown(m["text"])
+            if m.get("trace"):
+                render_trace(m["trace"])
+
+    prompt = st.chat_input("Ask about air quality…", key="aqi_chat_input") or clicked
+    if prompt:
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        st.session_state.chat_display.append({"role": "user", "text": prompt})
+
+        with st.chat_message("assistant"):
+            if not api_key:
+                st.session_state.chat_display.append({
+                    "role": "assistant", "level": "warning",
+                    "text": "I need an Anthropic API key first. Add it in the sidebar and ask again.",
+                })
+            else:
+                result, err = None, None
+                with st.spinner("Checking the data…"):
+                    try:
+                        result = run_assistant(
+                            make_client(api_key), MODELS[model_label],
+                            st.session_state.chat_history, prompt, assistant_tools,
+                        )
+                    except Exception as e:  # SDK errors -> readable message
+                        err = friendly_error(e)
+
+                if err:
+                    st.session_state.chat_display.append(
+                        {"role": "assistant", "level": "error", "text": err})
+                else:
+                    st.session_state.chat_display.append(
+                        {"role": "assistant", "text": result.text, "trace": result.trace})
+                    st.session_state.chat_history += [
+                        {"role": "user", "content": prompt},
+                        {"role": "assistant", "content": result.text},
+                    ]
+                    st.session_state.chat_history = st.session_state.chat_history[-12:]
+
+        # Redraw the tab from saved state so the history (and the Clear chat
+        # button, which is drawn above it) reflects this turn immediately.
+        st.rerun()

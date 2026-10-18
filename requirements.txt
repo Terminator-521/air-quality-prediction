@@ -7,3 +7,5 @@ streamlit
 joblib
 requests
 plotly
+anthropic
+# optional, only to run the tests:  pip install pytest

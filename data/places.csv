@@ -1,0 +1,293 @@
+place,state,latitude,longitude,coord_source
+Agartala,Tripura,23.83605,91.27939,GeoNames
+Agra,Uttar Pradesh,27.18333,78.01667,GeoNames
+Ahmedabad,Gujarat,23.02579,72.58727,GeoNames
+Ahmednagar,Maharashtra,19.09457,74.73843,GeoNames
+Aizawl,Mizoram,23.72894,92.71791,GeoNames
+Ajmer,Rajasthan,26.4521,74.63867,GeoNames
+Akola,Maharashtra,20.70957,76.9981,GeoNames
+Alwar,Rajasthan,27.56246,76.625,GeoNames
+Amaravati,Andhra Pradesh,16.514,80.516,GeoNames
+Ambala,Haryana,30.36099,76.79782,GeoNames
+Amravati,Maharashtra,20.93333,77.75,GeoNames
+Amritsar,Punjab,31.62234,74.87534,GeoNames
+Anantapur,Andhra Pradesh,14.67784,77.60813,GeoNames
+Angul,Odisha,20.84089,85.10192,GeoNames
+Ankleshwar,Gujarat,21.63236,72.99001,GeoNames
+Araria,Bihar,26.14934,87.51323,GeoNames
+Ariyalur,Tamil Nadu,11.14,79.08,approximate (manual)
+Arrah,Bihar,25.55629,84.66335,GeoNames
+Asansol,West Bengal,23.68333,86.98333,GeoNames
+Aurangabad (Bihar),Bihar,24.75204,84.3742,GeoNames
+Aurangabad (Maharashtra),Maharashtra,19.87757,75.34226,GeoNames
+Baddi,Himachal Pradesh,30.95783,76.79136,GeoNames
+Badlapur,Maharashtra,19.15516,73.26553,GeoNames
+Bagalkot,Karnataka,16.18673,75.69614,GeoNames
+Baghpat,Uttar Pradesh,28.94485,77.21865,GeoNames
+Bahadurgarh,Haryana,28.69287,76.93555,GeoNames
+Balasore,Odisha,21.49266,86.93348,GeoNames
+Ballabgarh,Haryana,28.34,77.32,approximate (manual)
+Banswara,Rajasthan,23.54109,74.4425,GeoNames
+Baran,Rajasthan,25.1,76.51667,GeoNames
+Barbil,Odisha,22.10194,85.37752,GeoNames
+Bareilly,Uttar Pradesh,28.36678,79.43167,GeoNames
+Baripada,Odisha,21.93458,86.72852,GeoNames
+Barmer,Rajasthan,25.74572,71.39211,GeoNames
+Barrackpore,West Bengal,22.76602,88.36336,GeoNames
+Bathinda,Punjab,30.20747,74.93893,GeoNames
+Begusarai,Bihar,25.41853,86.13389,GeoNames
+Belapur,Maharashtra,19.02,73.04,approximate (manual)
+Belgaum,Karnataka,15.85212,74.50447,GeoNames
+Bengaluru,Karnataka,12.97194,77.59369,GeoNames
+Bettiah,Bihar,26.80229,84.50311,GeoNames
+Bhagalpur,Bihar,25.24446,86.97183,GeoNames
+Bharatpur,Rajasthan,27.21731,77.49009,GeoNames
+Bhilai,Chhattisgarh,21.20919,81.4285,GeoNames
+Bhilwara,Rajasthan,25.34707,74.64081,GeoNames
+Bhiwadi,Rajasthan,28.21024,76.86056,GeoNames
+Bhiwandi,Maharashtra,19.30023,73.05881,GeoNames
+Bhiwani,Haryana,28.79304,76.13968,GeoNames
+Bhopal,Madhya Pradesh,23.25469,77.40289,GeoNames
+Bhubaneswar,Odisha,20.27241,85.83385,GeoNames
+Bidar,Karnataka,17.90802,77.51524,GeoNames
+Bihar Sharif,Bihar,25.20084,85.52389,GeoNames
+Bikaner,Rajasthan,28.01762,73.31495,GeoNames
+Bilaspur,Chhattisgarh,22.08005,82.15543,GeoNames
+Bileipada,Odisha,,,
+Boisar,Maharashtra,19.80362,72.75598,GeoNames
+Brajrajnagar,Odisha,21.81667,83.91667,GeoNames
+Bulandshahr,Uttar Pradesh,28.40392,77.85773,GeoNames
+Bundi,Rajasthan,25.43855,75.63735,GeoNames
+Buxar,Bihar,25.57548,83.98043,GeoNames
+Byasanagar,Odisha,20.95569,86.12643,GeoNames
+Byrnihat,Assam,26.04,91.87,approximate (manual)
+Chamarajanagar,Karnataka,11.92312,76.93949,GeoNames
+Chandigarh,Chandigarh,30.73629,76.7884,GeoNames
+Chandrapur,Maharashtra,19.95076,79.29523,GeoNames
+Charkhi Dadri,Haryana,28.59166,76.27161,GeoNames
+Chengalpattu,Tamil Nadu,12.69184,79.97661,GeoNames
+Chennai,Tamil Nadu,13.08784,80.27847,GeoNames
+Chhal,Chhattisgarh,,,
+Chhapra,Bihar,25.78031,84.74709,GeoNames
+Chikkaballapur,Karnataka,13.43,77.73,approximate (manual)
+Chikkamagaluru,Karnataka,13.32231,75.774,GeoNames
+Chittoor,Andhra Pradesh,13.21055,79.0956,GeoNames
+Chittorgarh,Rajasthan,24.88963,74.62403,GeoNames
+Churu,Rajasthan,28.30415,74.96718,GeoNames
+Coimbatore,Tamil Nadu,11.00555,76.96612,GeoNames
+Cuddalore,Tamil Nadu,11.75617,79.76693,GeoNames
+Cuttack,Odisha,20.46497,85.87927,GeoNames
+Damoh,Madhya Pradesh,23.83312,79.4419,GeoNames
+Darbhanga,Bihar,26.15216,85.89707,GeoNames
+Dausa,Rajasthan,26.89,76.33584,GeoNames
+Davanagere,Karnataka,14.46,75.92,approximate (manual)
+Dehradun,Uttarakhand,30.32443,78.03392,GeoNames
+Delhi,Delhi,28.65195,77.23149,GeoNames
+Dewas,Madhya Pradesh,22.96585,76.05526,GeoNames
+Dhanbad,Jharkhand,23.79759,86.42992,GeoNames
+Dharuhera,Haryana,28.20553,76.79691,GeoNames
+Dharwad,Karnataka,15.46,75.01,approximate (manual)
+Dholpur,Rajasthan,26.69286,77.87968,GeoNames
+Dhule,Maharashtra,20.9013,74.77737,GeoNames
+Dindigul,Tamil Nadu,10.36896,77.98036,GeoNames
+Dungarpur,Rajasthan,23.84306,73.71466,GeoNames
+Durgapur,West Bengal,23.51583,87.30801,GeoNames
+Eloor,Kerala,10.06667,76.28333,GeoNames
+Ernakulam,Kerala,9.93988,76.26022,GeoNames
+Faridabad,Haryana,28.41124,77.31316,GeoNames
+Fatehabad,Haryana,29.51525,75.45554,GeoNames
+Firozabad,Uttar Pradesh,27.15092,78.39781,GeoNames
+Gadag,Karnataka,15.42977,75.62971,GeoNames
+Gandhi Nagar,Gujarat,23.22,72.65,approximate (manual)
+Gangtok,Sikkim,27.32574,88.61216,GeoNames
+Gaya,Bihar,24.79686,85.00385,GeoNames
+Ghaziabad,Uttar Pradesh,28.66535,77.43915,GeoNames
+Gorakhpur,Uttar Pradesh,26.76628,83.36889,GeoNames
+Greater Noida,Uttar Pradesh,28.49615,77.53601,GeoNames
+Gummidipoondi,Tamil Nadu,13.41,80.11,approximate (manual)
+Gurugram,Haryana,28.4601,77.02635,GeoNames
+Guwahati,Assam,26.1844,91.7458,GeoNames
+Gwalior,Madhya Pradesh,26.22983,78.17337,GeoNames
+Hajipur,Bihar,25.68544,85.20981,GeoNames
+Haldia,West Bengal,22.06046,88.10975,GeoNames
+Hanumangarh,Rajasthan,29.58182,74.32938,GeoNames
+Hapur,Uttar Pradesh,28.72985,77.78068,GeoNames
+Hassan,Karnataka,13.00715,76.0962,GeoNames
+Haveri,Karnataka,14.79354,75.40448,GeoNames
+Hisar,Haryana,29.15394,75.72294,GeoNames
+Hosur,Tamil Nadu,12.73647,77.83264,GeoNames
+Howrah,West Bengal,22.57688,88.31857,GeoNames
+Hubballi,Karnataka,15.34776,75.13378,GeoNames
+Hyderabad,Telangana,17.38405,78.45636,GeoNames
+Imphal,Manipur,24.80805,93.9442,GeoNames
+Indore,Madhya Pradesh,22.71792,75.8333,GeoNames
+Jabalpur,Madhya Pradesh,23.16697,79.95006,GeoNames
+Jaipur,Rajasthan,26.91962,75.78781,GeoNames
+Jaisalmer,Rajasthan,26.91763,70.90387,GeoNames
+Jalandhar,Punjab,31.32556,75.57917,GeoNames
+Jalgaon,Maharashtra,21.00292,75.56602,GeoNames
+Jalna,Maharashtra,19.84102,75.88636,GeoNames
+Jalore,Rajasthan,25.35,72.62,approximate (manual)
+Jhalawar,Rajasthan,24.59633,76.16499,GeoNames
+Jhansi,Uttar Pradesh,25.45887,78.57994,GeoNames
+Jhunjhunu,Rajasthan,28.12559,75.39797,GeoNames
+Jind,Haryana,29.31577,76.31502,GeoNames
+Jodhpur,Rajasthan,26.26841,73.00594,GeoNames
+Jorapokhar,Jharkhand,23.7104,86.4131,approximate (manual)
+Kadapa,Andhra Pradesh,14.47995,78.82346,GeoNames
+Kaithal,Haryana,29.80153,76.39959,GeoNames
+Kalaburagi,Karnataka,17.33583,76.83757,GeoNames
+Kalyan,Maharashtra,19.2437,73.13554,GeoNames
+Kanchipuram,Tamil Nadu,12.83515,79.70006,GeoNames
+Kannur,Kerala,11.86752,75.35763,GeoNames
+Kanpur,Uttar Pradesh,26.46523,80.34975,GeoNames
+Karauli,Rajasthan,26.49831,77.02755,GeoNames
+Karnal,Haryana,29.69197,76.98448,GeoNames
+Karur,Tamil Nadu,10.95771,78.08095,GeoNames
+Karwar,Karnataka,14.81361,74.12972,GeoNames
+Kashipur,Uttarakhand,29.21399,78.95693,GeoNames
+Katihar,Bihar,25.53852,87.57044,GeoNames
+Katni,Madhya Pradesh,23.83776,80.39405,GeoNames
+Keonjhar,Odisha,21.6318,85.59686,GeoNames
+Khanna,Punjab,30.70547,76.22196,GeoNames
+Khurja,Uttar Pradesh,28.25382,77.85535,GeoNames
+Kishanganj,Bihar,26.10224,87.95534,GeoNames
+Kochi,Kerala,9.93988,76.26022,GeoNames
+Kohima,Nagaland,25.67467,94.11099,GeoNames
+Kolar,Karnataka,13.13768,78.12999,GeoNames
+Kolhapur,Maharashtra,16.69563,74.23167,GeoNames
+Kolkata,West Bengal,22.56263,88.36304,GeoNames
+Kollam,Kerala,8.88113,76.58469,GeoNames
+Koppal,Karnataka,15.34522,76.15478,GeoNames
+Korba,Chhattisgarh,22.3458,82.69633,GeoNames
+Kota,Rajasthan,25.18254,75.83907,GeoNames
+Kozhikode,Kerala,11.24802,75.7804,GeoNames
+Kunjemura,Chhattisgarh,,,
+Kurukshetra,Haryana,29.97,76.88,approximate (manual)
+Latur,Maharashtra,18.39721,76.56784,GeoNames
+Lucknow,Uttar Pradesh,26.83928,80.92313,GeoNames
+Ludhiana,Punjab,30.91204,75.85379,GeoNames
+Madikeri,Karnataka,12.42602,75.7382,GeoNames
+Madurai,Tamil Nadu,9.919,78.11953,GeoNames
+Mahad,Maharashtra,18.08333,73.41667,GeoNames
+Maihar,Madhya Pradesh,24.26594,80.76063,GeoNames
+Malegaon,Maharashtra,20.54966,74.53462,GeoNames
+Mandi Gobindgarh,Punjab,30.67,76.3,approximate (manual)
+Mandideep,Madhya Pradesh,23.08166,77.53328,GeoNames
+Mandikhera,Haryana,,,
+Manesar,Haryana,28.35311,76.94036,GeoNames
+Mangalore,Karnataka,12.91723,74.85603,GeoNames
+Manguraha,Bihar,,,
+Meerut,Uttar Pradesh,28.98002,77.70636,GeoNames
+Milupara,Chhattisgarh,,,
+Mira Bhayandar,Maharashtra,19.29,72.87,approximate (manual)
+Moradabad,Uttar Pradesh,28.83893,78.77684,GeoNames
+Motihari,Bihar,26.64862,84.91656,GeoNames
+Mumbai,Maharashtra,19.07283,72.88261,GeoNames
+Munger,Bihar,25.37459,86.47455,GeoNames
+Muzaffarnagar,Uttar Pradesh,29.47091,77.70332,GeoNames
+Muzaffarpur,Bihar,26.12259,85.39055,GeoNames
+Mysuru,Karnataka,12.29791,76.63925,GeoNames
+NOIDA,Uttar Pradesh,28.58,77.33,GeoNames
+Nagaon,Assam,26.35,92.66667,GeoNames
+Nagapattinam,Tamil Nadu,10.76377,79.84313,GeoNames
+Nagaur,Rajasthan,27.20201,73.73394,GeoNames
+Nagpur,Maharashtra,21.14631,79.08491,GeoNames
+Naharlagun,Arunachal Pradesh,27.10467,93.69518,GeoNames
+Nalbari,Assam,26.43937,91.44041,GeoNames
+Namakkal,Tamil Nadu,11.22126,78.16524,GeoNames
+Nanded,Maharashtra,19.16023,77.31497,GeoNames
+Nandesari,Gujarat,22.33,73.09,approximate (manual)
+Narnaul,Haryana,28.04444,76.10833,GeoNames
+Nashik,Maharashtra,19.99727,73.79096,GeoNames
+Navi Mumbai,Maharashtra,19.03681,73.01582,GeoNames
+Nayagarh,Odisha,20.12882,85.09626,GeoNames
+Ooty,Tamil Nadu,11.4134,76.69521,GeoNames
+Pali,Rajasthan,25.77276,73.32335,GeoNames
+Palkalaiperur,Tamil Nadu,,,
+Palwal,Haryana,28.14469,77.32546,GeoNames
+Panchgaon,Haryana,,,
+Panchkula,Haryana,30.69461,76.8504,GeoNames
+Panipat,Haryana,29.38747,76.96825,GeoNames
+Parbhani,Maharashtra,19.26855,76.77081,GeoNames
+Pathardih,Jharkhand,23.6658,86.43166,GeoNames
+Patiala,Punjab,30.33625,76.3922,GeoNames
+Patna,Bihar,25.59408,85.13563,GeoNames
+Pimpri Chinchwad,Maharashtra,18.61867,73.80375,GeoNames
+Pithampur,Madhya Pradesh,22.60197,75.69649,GeoNames
+Pratapgarh,Rajasthan,24.03215,74.78162,GeoNames
+Prayagraj,Uttar Pradesh,25.44478,81.84322,GeoNames
+Puducherry,Puducherry,11.93381,79.82979,GeoNames
+Pudukottai,Tamil Nadu,10.38128,78.82141,GeoNames
+Pune,Maharashtra,18.51957,73.85535,GeoNames
+Purnia,Bihar,25.77895,87.47422,GeoNames
+Raichur,Karnataka,16.20546,77.35567,GeoNames
+Raipur,Chhattisgarh,21.23333,81.63333,GeoNames
+Rairangpur,Odisha,22.26675,86.17385,GeoNames
+Rajamahendravaram,Andhra Pradesh,17.00517,81.77784,GeoNames
+Rajgir,Bihar,25.02828,85.42079,GeoNames
+Rajsamand,Rajasthan,25.07145,73.8798,GeoNames
+Ramanagara,Karnataka,12.72,77.28,approximate (manual)
+Ramanathapuram,Tamil Nadu,9.37158,78.83077,GeoNames
+Ranipet,Tamil Nadu,12.92471,79.33331,GeoNames
+Ratlam,Madhya Pradesh,23.33033,75.04032,GeoNames
+Rishikesh,Uttarakhand,30.10778,78.29255,GeoNames
+Rohtak,Haryana,28.89447,76.58917,GeoNames
+Rourkela,Odisha,22.22496,84.86414,GeoNames
+Rupnagar,Punjab,30.96896,76.52695,GeoNames
+Sagar,Madhya Pradesh,23.83877,78.73874,GeoNames
+Saharsa,Bihar,25.87498,86.59611,GeoNames
+Salem,Tamil Nadu,11.65376,78.15538,GeoNames
+Samastipur,Bihar,25.86222,85.77953,GeoNames
+Sangli,Maharashtra,16.85438,74.56417,GeoNames
+Sasaram,Bihar,24.94942,84.01645,GeoNames
+Satna,Madhya Pradesh,24.57726,80.82719,GeoNames
+Sawai Madhopur,Rajasthan,26.02301,76.34408,GeoNames
+Shillong,Meghalaya,25.56892,91.88313,GeoNames
+Shivamogga,Karnataka,13.93157,75.56791,GeoNames
+Sikar,Rajasthan,27.61206,75.13996,GeoNames
+Silchar,Assam,24.82733,92.79787,GeoNames
+Siliguri,West Bengal,26.71004,88.42851,GeoNames
+Singrauli,Madhya Pradesh,24.19973,82.67535,GeoNames
+Sirohi,Rajasthan,24.88838,72.84794,GeoNames
+Sirsa,Haryana,29.53489,75.02898,GeoNames
+Sivasagar,Assam,26.98,94.64,approximate (manual)
+Siwan,Bihar,26.22096,84.35609,GeoNames
+Solapur,Maharashtra,17.67152,75.91044,GeoNames
+Sonipat,Haryana,28.99478,77.01937,GeoNames
+Sri Ganganagar,Rajasthan,29.92009,73.87496,GeoNames
+Sri Vijaya Puram,Andaman and Nicobar Islands,11.66613,92.74635,GeoNames
+Srinagar,Jammu and Kashmir,34.08565,74.80555,GeoNames
+Suakati,Odisha,,,
+Surat,Gujarat,21.19594,72.83023,GeoNames
+Talcher,Odisha,20.94927,85.23354,GeoNames
+Tensa,Odisha,,,
+Thane,Maharashtra,19.19704,72.96355,GeoNames
+Thanjavur,Tamil Nadu,10.78523,79.13909,GeoNames
+Thiruvananthapuram,Kerala,8.4855,76.94924,GeoNames
+Thoothukudi,Tamil Nadu,8.76735,78.13425,GeoNames
+Thrissur,Kerala,10.51667,76.21667,GeoNames
+Tiruchirappalli,Tamil Nadu,10.8155,78.69651,GeoNames
+Tirumala,Andhra Pradesh,13.63551,79.41989,GeoNames
+Tirunelveli,Tamil Nadu,8.72742,77.6838,GeoNames
+Tirupati,Andhra Pradesh,13.63551,79.41989,GeoNames
+Tiruppur,Tamil Nadu,11.11541,77.35456,GeoNames
+Tonk,Rajasthan,26.16638,75.78824,GeoNames
+Tumakuru,Karnataka,13.34136,77.1022,GeoNames
+Tumidih,Chhattisgarh,,,
+Udaipur,Rajasthan,24.58584,73.71346,GeoNames
+Udupi,Karnataka,13.33467,74.74617,GeoNames
+Ujjain,Madhya Pradesh,23.18239,75.77643,GeoNames
+Ulhasnagar,Maharashtra,19.21667,73.15,GeoNames
+Vapi,Gujarat,20.37175,72.90493,GeoNames
+Varanasi,Uttar Pradesh,25.31668,83.01041,GeoNames
+Vatva,Gujarat,22.97,72.65,approximate (manual)
+Vellore,Tamil Nadu,12.9184,79.13255,GeoNames
+Vijayapura,Karnataka,16.82442,75.71537,GeoNames
+Vijayawada,Andhra Pradesh,16.50745,80.6466,GeoNames
+Virar,Maharashtra,19.45591,72.81136,GeoNames
+Virudhunagar,Tamil Nadu,9.58,77.96,approximate (manual)
+Visakhapatnam,Andhra Pradesh,17.73308,83.31622,GeoNames
+Vrindavan,Uttar Pradesh,27.58105,77.69662,GeoNames
+Yadgir,Karnataka,16.77007,77.13755,GeoNames
+Yamunanagar,Haryana,30.12796,77.28371,GeoNames
