@@ -25,6 +25,10 @@ def app(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(live_data, "geocode", fake_geocode)
     monkeypatch.setattr(live_data, "fetch_air_quality", fake_fetch_factory({}))
+    monkeypatch.setattr(live_data, "fetch_weather", lambda lat, lon: {
+        "temperature_2m": 25.0, "relative_humidity_2m": 50,
+        "wind_speed_10m": 8.0, "precipitation": 0.0,
+    })
     at = AppTest.from_file(str(ROOT / "dashboard.py"), default_timeout=90)
     at.run()
     assert not at.exception, at.exception
@@ -36,9 +40,13 @@ def ask(at, text):
     return at
 
 
-def test_loads_with_four_tabs(app):
+def set_api_key(at, value):
+    next(box for box in at.text_input if box.key == "assistant_api_key").set_value(value).run()
+
+
+def test_loads_with_six_tabs(app):
     assert [t.label for t in app.tabs][-1] == "🤖 AQI Assistant"
-    assert len(app.tabs) == 4
+    assert len(app.tabs) == 6
     assert any("API key" in i.value for i in app.info)        # prompts for a key
 
 
@@ -56,7 +64,7 @@ def test_full_chat_with_tool_call(app, monkeypatch):
     ])
     monkeypatch.setattr(assistant, "make_client", lambda key: fake)
 
-    app.sidebar.text_input[0].set_value("sk-test-key").run()
+    set_api_key(app, "sk-test-key")
     ask(app, "How is Delhi?")
 
     assert not app.exception, app.exception
@@ -80,7 +88,7 @@ def test_full_chat_with_tool_call(app, monkeypatch):
 def test_sample_question_button(app, monkeypatch):
     fake = FakeClient([resp([text_block("Here you go.")], "end_turn")])
     monkeypatch.setattr(assistant, "make_client", lambda key: fake)
-    app.sidebar.text_input[0].set_value("sk-test-key").run()
+    set_api_key(app, "sk-test-key")
     app.button(key="sample_0").click().run()
     assert not app.exception
     assert fake.calls[0]["messages"][-1]["content"] == assistant.SAMPLE_QUESTIONS[0]
@@ -98,7 +106,7 @@ def test_bad_key_shows_friendly_error(app, monkeypatch):
             raise anthropic.AuthenticationError("bad", response=httpx.Response(401, request=req), body=None)
 
     monkeypatch.setattr(assistant, "make_client", lambda key: Rejecting())
-    app.sidebar.text_input[0].set_value("sk-wrong").run()
+    set_api_key(app, "sk-wrong")
     ask(app, "How is Delhi?")
     assert not app.exception
     assert any("key was rejected" in e.value for e in app.error)
@@ -115,7 +123,7 @@ def test_clear_button_appears_right_after_first_answer(app, monkeypatch):
     fake = FakeClient([resp([text_block("Hi.")], "end_turn")])
     monkeypatch.setattr(assistant, "make_client", lambda key: fake)
     assert not clear_button(app)                      # nothing to clear yet
-    app.sidebar.text_input[0].set_value("sk-test-key").run()
+    set_api_key(app, "sk-test-key")
     ask(app, "hello")
     assert not app.exception, app.exception
     assert len(clear_button(app)) == 1
@@ -124,7 +132,7 @@ def test_clear_button_appears_right_after_first_answer(app, monkeypatch):
 def test_clear_chat(app, monkeypatch):
     fake = FakeClient([resp([text_block("Hi.")], "end_turn")])
     monkeypatch.setattr(assistant, "make_client", lambda key: fake)
-    app.sidebar.text_input[0].set_value("sk-test-key").run()
+    set_api_key(app, "sk-test-key")
     ask(app, "hello")
     assert len(app.chat_message) == 2
     clear_button(app)[0].click().run()

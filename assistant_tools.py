@@ -23,6 +23,7 @@ import time
 import pandas as pd
 
 import live_data
+from config import LIVE_CACHE_SECONDS
 from data_prep_india import search_city
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -112,8 +113,7 @@ def _r(x, n=1):
 class AirQualityTools:
     """Holds the models + data and exposes the tools the LLM can call."""
 
-    def __init__(self, clf, reg, features, hist_df, geocode_fn=None, fetch_fn=None, ttl=900):
-        self.clf = clf
+    def __init__(self, reg, features, hist_df, geocode_fn=None, fetch_fn=None, ttl=LIVE_CACHE_SECONDS):
         self.reg = reg
         self.features = features
         self.hist = hist_df
@@ -171,7 +171,7 @@ class AirQualityTools:
             return loc, matches, hit[1]
 
         df = fetch(loc["latitude"], loc["longitude"])
-        df = live_data.add_predictions(df, self.clf, self.reg, self.features)
+        df = live_data.add_predictions(df, self.reg, self.features)
         self._cache[key] = (time.monotonic(), df)
         return loc, matches, df
 

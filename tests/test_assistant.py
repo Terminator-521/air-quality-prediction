@@ -26,7 +26,7 @@ except ImportError:
 import assistant
 import live_data
 from assistant_tools import AirQualityTools, CATEGORIES
-from data_prep_india import load_history
+from data_prep_india import aqi_to_bucket, load_history
 
 pytestmark = pytest.mark.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +64,6 @@ def fake_geocode(query, count=5):
 @pytest.fixture(scope="module")
 def parts():
     return (
-        joblib.load(ROOT / "models/india_aqi_classifier.joblib"),
         joblib.load(ROOT / "models/india_aqi_regressor.joblib"),
         joblib.load(ROOT / "models/india_features.joblib"),
         load_history(str(ROOT / "data/city_day.csv"), str(ROOT / "data/aqi_daily_2022_2025.csv.gz")),
@@ -73,9 +72,9 @@ def parts():
 
 @pytest.fixture()
 def tools(parts):
-    clf, reg, feats, hist = parts
+    reg, feats, hist = parts
     counter = {}
-    t = AirQualityTools(clf, reg, feats, hist,
+    t = AirQualityTools(reg, feats, hist,
                         geocode_fn=fake_geocode, fetch_fn=fake_fetch_factory(counter))
     t.counter = counter
     return t
@@ -86,6 +85,7 @@ def test_current_aqi(tools):
     out = tools.call("get_current_aqi", {"place": "delhi"})
     assert "error" not in out
     assert out["category"] in CATEGORIES
+    assert out["category"] == aqi_to_bucket(out["estimated_aqi"])
     assert 0 < out["estimated_aqi"] < 1000
     assert set(out["pollutants_ug_m3"]) == {"PM2.5", "PM10", "NO2", "SO2", "O3"}
     assert out["other_possible_matches"]          # ambiguity is surfaced
@@ -182,13 +182,13 @@ def test_call_never_raises(tools, parts):
 
     def boom(*a, **k):
         raise live_data.LiveDataError("Couldn't reach the air quality service (test).")
-    clf, reg, feats, hist = parts
-    t = AirQualityTools(clf, reg, feats, hist, geocode_fn=fake_geocode, fetch_fn=boom)
+    reg, feats, hist = parts
+    t = AirQualityTools(reg, feats, hist, geocode_fn=fake_geocode, fetch_fn=boom)
     assert "Couldn't reach" in t.call("get_current_aqi", {"place": "delhi"})["error"]
 
     def weird(*a, **k):
         raise RuntimeError("secret internal detail")
-    t = AirQualityTools(clf, reg, feats, hist, geocode_fn=fake_geocode, fetch_fn=weird)
+    t = AirQualityTools(reg, feats, hist, geocode_fn=fake_geocode, fetch_fn=weird)
     err = t.call("get_current_aqi", {"place": "delhi"})["error"]
     assert "secret internal detail" not in err      # internals are not leaked to the model/user
 

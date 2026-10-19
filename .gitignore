@@ -8,3 +8,7 @@ venv/
 *.egg-info/
 .streamlit/
 .pytest_cache/
+data/forecast_tracking.sqlite
+data/air_quality.sqlite
+data/air_quality.sqlite-shm
+data/air_quality.sqlite-wal
