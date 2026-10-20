@@ -10,13 +10,9 @@ Loads and cleans the India air quality data:
 
 Adds two things the Italy dataset didn't need:
   1. A location/city search helper, since this dataset covers 26 cities.
-  2. A "crop burning season" flag. Every year around mid-October to the
-     end of November, large-scale paddy stubble burning across Punjab and
-     Haryana sends a smoke plume across North India, driving a sharp,
-     well-documented AQI spike in Delhi-NCR and nearby cities (Amritsar,
-     Chandigarh, Lucknow, Patna). Flagging this window lets the dashboard
-     show its effect directly instead of it just being lost in the noise
-     of "October" and "November" as ordinary months.
+  2. A "crop burning season" flag. The dashboard compares AQI in the
+     mid-October to end-November window with the rest of the year. This is a
+     seasonal association, not a causal attribution for individual AQI spikes.
 """
 
 import numpy as np
@@ -82,7 +78,7 @@ def load_and_clean(path: str = RAW_PATH) -> pd.DataFrame:
     df = df.dropna(subset=["AQI"])
 
     # Recompute AQI_Bucket wherever it's missing but AQI is now known
-    df["AQI_Bucket"] = df["AQI_Bucket"].fillna(df["AQI"].apply(_aqi_to_bucket))
+    df["AQI_Bucket"] = df["AQI_Bucket"].fillna(df["AQI"].apply(aqi_to_bucket))
 
     df["month"] = df["Date"].dt.month
     df["day"] = df["Date"].dt.day
@@ -124,7 +120,7 @@ def load_new_data(path: str = NEW_PATH) -> pd.DataFrame:
     """Kaggle India AQI 2022-2025: daily AQI per place (no pollutant concentrations)."""
     d = pd.read_csv(path, parse_dates=["date"])
     d = d.rename(columns={"place": "City", "state": "State", "date": "Date", "aqi": "AQI"})
-    d["AQI_Bucket"] = d["AQI"].apply(_aqi_to_bucket)  # CPCB breakpoints, same as the old data
+    d["AQI_Bucket"] = d["AQI"].apply(aqi_to_bucket)  # CPCB breakpoints, same as the old data
     d["source"] = "2022-2025"
     return _add_calendar(d)
 
@@ -169,7 +165,7 @@ def place_coords(places, city):
     return float(row.iloc[0]["latitude"]), float(row.iloc[0]["longitude"])
 
 
-def _aqi_to_bucket(aqi: float) -> str:
+def aqi_to_bucket(aqi: float) -> str:
     """Standard Indian CPCB AQI category breakpoints."""
     if aqi <= 50:
         return "Good"
