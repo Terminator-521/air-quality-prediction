@@ -1,84 +1,93 @@
-"""Local forecast-revision tracking for the dashboard.
+"""Forecast-revision tracking using the configured shared project database.
 
-This intentionally compares a saved Open-Meteo forecast with a later refreshed
-Open-Meteo estimate. It is useful for checking forecast stability, but it is
-not a substitute for validation against an official ground monitor.
+Comparisons are between an earlier Open-Meteo model forecast and a later
+Open-Meteo estimate, not between a forecast and an official monitor.
 """
 
-import sqlite3
 from datetime import datetime, timezone
 
 import pandas as pd
 
-from config import FORECAST_TRACKER_PATH
-
-
-def _connection():
-    FORECAST_TRACKER_PATH.parent.mkdir(exist_ok=True)
-    connection = sqlite3.connect(FORECAST_TRACKER_PATH)
-    connection.execute("""
-        CREATE TABLE IF NOT EXISTS forecasts (
-            latitude REAL NOT NULL, longitude REAL NOT NULL, target_time TEXT NOT NULL,
-            issued_at TEXT NOT NULL, lead_hours REAL, predicted_aqi REAL NOT NULL,
-            PRIMARY KEY (latitude, longitude, target_time, issued_at)
-        )
-    """)
-    columns = {row[1] for row in connection.execute("PRAGMA table_info(forecasts)")}
-    if "lead_hours" not in columns:
-        connection.execute("ALTER TABLE forecasts ADD COLUMN lead_hours REAL")
-    connection.execute("""
-        CREATE TABLE IF NOT EXISTS refreshed_estimates (
-            latitude REAL NOT NULL, longitude REAL NOT NULL, target_time TEXT NOT NULL,
-            estimated_aqi REAL NOT NULL, refreshed_at TEXT NOT NULL,
-            PRIMARY KEY (latitude, longitude, target_time)
-        )
-    """)
-    return connection
+import database
 
 
 def record(location, frame):
     """Store forecast rows and later refreshed rows for one location."""
+    database.initialize()
     lat, lon = round(float(location["latitude"]), 3), round(float(location["longitude"]), 3)
+    place = ", ".join(part for part in (location.get("name"), location.get("admin1"), location.get("country")) if part)
     now = datetime.now(timezone.utc).isoformat()
     actual = frame[~frame["is_forecast"]]
     reference_time = actual["time"].max() if len(actual) else frame["time"].min()
-    connection = _connection()
-    try:
-        forecasts = frame[frame["is_forecast"]]
-        connection.executemany(
-            "INSERT OR IGNORE INTO forecasts (latitude, longitude, target_time, issued_at, lead_hours, predicted_aqi) VALUES (?, ?, ?, ?, ?, ?)",
-            [(lat, lon, row.time.isoformat(), now, (row.time - reference_time).total_seconds() / 3600, float(row.predicted_aqi)) for row in forecasts.itertuples()],
+    forecasts = frame[frame["is_forecast"]]
+    refreshed = frame[~frame["is_forecast"]]
+    with database.session() as db:
+        db.executemany(
+            "INSERT OR IGNORE INTO forecasts (latitude, longitude, target_time, issued_at, lead_hours, predicted_aqi, place) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(lat, lon, row.time.isoformat(), now, (row.time - reference_time).total_seconds() / 3600, float(row.predicted_aqi), place) for row in forecasts.itertuples()],
         )
-        refreshed = frame[~frame["is_forecast"]]
-        connection.executemany(
-            "INSERT OR REPLACE INTO refreshed_estimates VALUES (?, ?, ?, ?, ?)",
-            [(lat, lon, row.time.isoformat(), float(row.predicted_aqi), now) for row in refreshed.itertuples()],
-        )
-        connection.commit()
-    finally:
-        connection.close()
+        for row in refreshed.itertuples():
+            db.execute("""
+                INSERT INTO refreshed_estimates (latitude, longitude, target_time, estimated_aqi, refreshed_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(latitude, longitude, target_time) DO UPDATE SET
+                    estimated_aqi=excluded.estimated_aqi, refreshed_at=excluded.refreshed_at
+            """, (lat, lon, row.time.isoformat(), float(row.predicted_aqi), now))
 
 
 def summary(location):
     """Return comparison metrics where an older saved forecast has matured."""
     lat, lon = round(float(location["latitude"]), 3), round(float(location["longitude"]), 3)
-    connection = _connection()
-    try:
-        rows = pd.read_sql_query("""
-            SELECT f.predicted_aqi, r.estimated_aqi,
-                   f.lead_hours
+    database.initialize()
+    with database.session() as db:
+        rows = db.execute("""
+            SELECT f.predicted_aqi, r.estimated_aqi, f.lead_hours
             FROM forecasts f JOIN refreshed_estimates r
               ON f.latitude = r.latitude AND f.longitude = r.longitude AND f.target_time = r.target_time
             WHERE f.latitude = ? AND f.longitude = ? AND f.issued_at < r.refreshed_at AND f.lead_hours IS NOT NULL
-        """, connection, params=(lat, lon))
-    finally:
-        connection.close()
-    if rows.empty:
+        """, (lat, lon)).fetchall()
+    if not rows:
         return {"samples": 0}
-    rows["absolute_error"] = (rows["predicted_aqi"] - rows["estimated_aqi"]).abs()
+    frame = pd.DataFrame([dict(row) for row in rows])
+    frame["absolute_error"] = (frame["predicted_aqi"] - frame["estimated_aqi"]).abs()
     return {
-        "samples": int(len(rows)),
-        "mae": round(float(rows["absolute_error"].mean()), 1),
-        "by_horizon": [{"horizon": "0-24h" if lead < 24 else "24h+", "mae": round(float(group.absolute_error.mean()), 1), "samples": int(len(group))}
-                       for lead, group in rows.groupby(rows.lead_hours < 24)],
+        "samples": int(len(frame)),
+        "mae": round(float(frame["absolute_error"].mean()), 1),
+        "by_horizon": [{"horizon": horizon, "mae": round(float(group.absolute_error.mean()), 1), "samples": int(len(group))}
+                       for horizon, group in _horizon_groups(frame).items()],
     }
+
+
+def _horizon_groups(frame):
+    labels = pd.cut(frame["lead_hours"], bins=[-float("inf"), 24, 48, float("inf")],
+                    labels=["0–24h", "24–48h", "48h+"] , right=False)
+    return {label: frame.loc[labels == label] for label in labels.dropna().unique()}
+
+
+def accuracy_by_location():
+    """Matured model-to-model MAE grouped by place and forecast lead time."""
+    database.initialize()
+    with database.session() as db:
+        rows = db.execute("""
+            SELECT place, latitude, longitude, lead_time AS "Lead time", COUNT(*) AS "Matured points",
+                   ROUND(AVG(absolute_error), 1) AS "MAE (AQI)"
+            FROM (
+                SELECT f.place, f.latitude, f.longitude,
+                       CASE WHEN f.lead_hours < 24 THEN '0–24h'
+                            WHEN f.lead_hours < 48 THEN '24–48h' ELSE '48h+' END AS lead_time,
+                       ABS(f.predicted_aqi - r.estimated_aqi) AS absolute_error
+                FROM forecasts f JOIN refreshed_estimates r
+                  ON f.latitude = r.latitude AND f.longitude = r.longitude AND f.target_time = r.target_time
+                WHERE f.issued_at < r.refreshed_at AND f.lead_hours IS NOT NULL
+            ) comparisons
+            GROUP BY place, latitude, longitude, lead_time
+            ORDER BY place, CASE lead_time WHEN '0–24h' THEN 0 WHEN '24–48h' THEN 1 ELSE 2 END
+        """).fetchall()
+    columns = ["Place", "Lead time", "Matured points", "MAE (AQI)"]
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    frame = pd.DataFrame([dict(row) for row in rows])
+    frame["Place"] = frame.apply(
+        lambda row: row["place"] or f'{row["latitude"]:.3f}, {row["longitude"]:.3f}', axis=1
+    )
+    return frame[columns].sort_values(["Place", "Lead time"]).reset_index(drop=True)

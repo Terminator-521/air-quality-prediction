@@ -1,164 +1,86 @@
-"""
-End-to-end tests of the AQI Assistant tab, driven through Streamlit's AppTest.
-Network and the Anthropic API are faked; the dashboard, tools and models are real.
-
-Run from the project folder:   python -m pytest tests -q
-"""
+"""Smoke tests for the Streamlit dashboard without network access."""
 from pathlib import Path
 
-import pytest
+import pandas as pd
 from streamlit.testing.v1 import AppTest
 
-import anthropic
-import assistant
 import live_data
-from test_assistant import (FakeClient, fake_fetch_factory, fake_geocode,
-                            resp, text_block, tool_block)
 
-pytestmark = pytest.mark.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parent.parent
 
 
-@pytest.fixture()
-def app(monkeypatch):
-    monkeypatch.chdir(ROOT)                                   # dashboard uses relative paths
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setattr(live_data, "geocode", fake_geocode)
-    monkeypatch.setattr(live_data, "fetch_air_quality", fake_fetch_factory({}))
-    monkeypatch.setattr(live_data, "fetch_weather", lambda lat, lon: {
-        "temperature_2m": 25.0, "relative_humidity_2m": 50,
-        "wind_speed_10m": 8.0, "precipitation": 0.0,
+def test_dashboard_has_only_the_three_kept_tabs(monkeypatch):
+    monkeypatch.chdir(ROOT)
+    monkeypatch.setattr(live_data, "geocode", lambda *args, **kwargs: [])
+    monkeypatch.setattr(live_data, "fetch_air_quality", lambda *args, **kwargs: pd.DataFrame())
+    monkeypatch.setattr(live_data, "fetch_weather", lambda *args, **kwargs: {})
+
+    app = AppTest.from_file(str(ROOT / "dashboard.py"), default_timeout=90).run()
+
+    assert not app.exception, app.exception
+    assert [tab.label for tab in app.tabs] == [
+        "🌍 Live Air Quality & Forecast",
+        "🗺️ India Map & Compare",
+        "ℹ️ Data Sources & Status",
+    ]
+    assert not any((box.key or "").startswith("assistant") for box in app.text_input)
+
+
+def test_live_place_picker_remains_available(monkeypatch):
+    monkeypatch.chdir(ROOT)
+    monkeypatch.setattr(live_data, "geocode", lambda *args, **kwargs: [])
+    now = pd.Timestamp.now().floor("h")
+    hourly = pd.DataFrame({
+        "time": [now - pd.Timedelta(hours=1), now + pd.Timedelta(hours=1), now + pd.Timedelta(hours=5)],
+        "PM2.5": [25.0, 30.0, 45.0], "PM10": [40.0, 50.0, 70.0],
+        "CO": [0.4, 0.5, 0.6], "NO2": [10.0, 12.0, 16.0],
+        "SO2": [5.0, 6.0, 8.0], "O3": [30.0, 35.0, 40.0],
+        "is_forecast": [False, True, True],
     })
-    at = AppTest.from_file(str(ROOT / "dashboard.py"), default_timeout=90)
-    at.run()
-    assert not at.exception, at.exception
-    return at
+    monkeypatch.setattr(live_data, "fetch_air_quality", lambda *args, **kwargs: hourly.copy())
+    monkeypatch.setattr(live_data, "fetch_weather", lambda *args, **kwargs: {})
 
+    app = AppTest.from_file(str(ROOT / "dashboard.py"), default_timeout=90).run()
 
-def ask(at, text):
-    at.chat_input[0].set_value(text).run()
-    return at
-
-
-def set_api_key(at, value):
-    next(box for box in at.text_input if box.key == "assistant_api_key").set_value(value).run()
-
-
-def test_loads_with_six_tabs(app):
-    assert [t.label for t in app.tabs][-1] == "🤖 AQI Assistant"
-    assert len(app.tabs) == 6
-    assert any("API key" in i.value for i in app.info)        # prompts for a key
-
-
-def test_without_key_asks_for_one(app):
-    ask(app, "How is Delhi?")
-    assert not app.exception
-    assert any("API key" in w.value for w in app.warning)
-    assert app.session_state["chat_history"] == []            # nothing sent to the LLM
-
-
-def test_full_chat_with_tool_call(app, monkeypatch):
-    fake = FakeClient([
-        resp([tool_block("t1", "get_current_aqi", {"place": "Delhi"})], "tool_use"),
-        resp([text_block("Delhi's air is currently estimated as shown above.")], "end_turn"),
-    ])
-    monkeypatch.setattr(assistant, "make_client", lambda key: fake)
-
-    set_api_key(app, "sk-test-key")
-    ask(app, "How is Delhi?")
-
+    picker = next(box for box in app.selectbox if box.key == "live_pick")
+    assert "Pune" in picker.options
+    picker.set_value("Pune").run()
     assert not app.exception, app.exception
-    roles = [m.name for m in app.chat_message]
-    assert roles == ["user", "assistant"]
-    assert "currently estimated" in app.chat_message[1].markdown[0].value
-    assert any("1 tool call used" in e.label for e in app.expander)
-    assert app.session_state["chat_history"][-1]["role"] == "assistant"
-    # the model was given the tools and the selected model string
-    assert fake.calls[0]["model"] == "claude-haiku-5-5" and fake.calls[0]["tools"]
-
-    # a follow-up keeps the conversation context
-    fake.script = [resp([text_block("Mumbai is cleaner.")], "end_turn")]
-    ask(app, "And Mumbai?")
-    assert not app.exception
-    sent = fake.calls[-1]["messages"]
-    assert [m["role"] for m in sent] == ["user", "assistant", "user"]
-    assert len(app.chat_message) == 4
+    assert any("AQI average" in table.value.columns for table in app.dataframe)
 
 
-def test_sample_question_button(app, monkeypatch):
-    fake = FakeClient([resp([text_block("Here you go.")], "end_turn")])
-    monkeypatch.setattr(assistant, "make_client", lambda key: fake)
-    set_api_key(app, "sk-test-key")
-    app.button(key="sample_0").click().run()
-    assert not app.exception
-    assert fake.calls[0]["messages"][-1]["content"] == assistant.SAMPLE_QUESTIONS[0]
+def test_daily_forecast_summary_pairs_aqi_with_pollutant_estimates():
+    hourly = pd.DataFrame({
+        "time": pd.to_datetime(["2026-10-19 09:00", "2026-10-19 15:00", "2026-10-20 09:00"]),
+        "predicted_aqi": [80, 120, 240],
+        "PM2.5": [20.0, 40.0, 80.0],
+        "PM10": [35.0, 55.0, 100.0],
+        "NO2": [10.0, 20.0, 40.0],
+        "SO2": [5.0, 7.0, 12.0],
+        "O3": [30.0, 50.0, 70.0],
+        "CO": [0.3, 0.5, 0.8],
+    })
+
+    daily = live_data.daily_forecast_summary(hourly)
+
+    assert len(daily) == 2
+    assert daily.loc[0, "AQI average"] == 100
+    assert daily.loc[0, "AQI peak"] == 120
+    assert daily.loc[0, "Category"] == "Satisfactory"
+    assert daily.loc[0, "PM2.5 (µg/m³)"] == 30
+    assert daily.loc[0, "CO (mg/m³)"] == 0.4
+    assert daily.loc[1, "Category"] == "Poor"
 
 
-def test_bad_key_shows_friendly_error(app, monkeypatch):
-    import httpx2 as httpx
-    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
-
-    class Rejecting:
-        messages = None
-        def __init__(self):
-            self.messages = self
-        def create(self, **kw):
-            raise anthropic.AuthenticationError("bad", response=httpx.Response(401, request=req), body=None)
-
-    monkeypatch.setattr(assistant, "make_client", lambda key: Rejecting())
-    set_api_key(app, "sk-wrong")
-    ask(app, "How is Delhi?")
-    assert not app.exception
-    assert any("key was rejected" in e.value for e in app.error)
-    assert app.session_state["chat_history"] == []            # failed turn isn't replayed to the LLM
-
-
-def clear_button(app):
-    return [b for b in app.button if "Clear chat" in b.label]
-
-
-def test_clear_button_appears_right_after_first_answer(app, monkeypatch):
-    """Regression: the button used to be drawn before the first message was saved,
-    so it only showed up after a second interaction."""
-    fake = FakeClient([resp([text_block("Hi.")], "end_turn")])
-    monkeypatch.setattr(assistant, "make_client", lambda key: fake)
-    assert not clear_button(app)                      # nothing to clear yet
-    set_api_key(app, "sk-test-key")
-    ask(app, "hello")
-    assert not app.exception, app.exception
-    assert len(clear_button(app)) == 1
-
-
-def test_clear_chat(app, monkeypatch):
-    fake = FakeClient([resp([text_block("Hi.")], "end_turn")])
-    monkeypatch.setattr(assistant, "make_client", lambda key: fake)
-    set_api_key(app, "sk-test-key")
-    ask(app, "hello")
-    assert len(app.chat_message) == 2
-    clear_button(app)[0].click().run()
-    assert not app.exception
-    assert app.session_state["chat_display"] == [] and app.session_state["chat_history"] == []
-    assert len(app.chat_message) == 0 and not clear_button(app)
-    assert len(fake.calls) == 1                       # clearing doesn't call the API
-
-
-# ----------------------------------------------------------------- history / places
-def _select(at, key, value):
-    next(s for s in at.selectbox if s.key == key).set_value(value).run()
-    assert not at.exception, at.exception
-
-
-def test_history_state_filter_and_place_without_coordinates(app):
-    _select(app, "hist_state", "Punjab")
-    places = next(s for s in app.selectbox if s.key == "hist_city").options
-    assert 5 < len(places) < 60 and "Amritsar" in places
-    _select(app, "hist_state", "Chhattisgarh")
-    _select(app, "hist_city", "Tumidih")        # a place with no map coordinate
-    assert any("No map coordinate" in c.value for c in app.caption)
-
-
-def test_history_same_named_places_and_live_pick(app):
-    _select(app, "hist_city", "Aurangabad (Bihar)")
-    _select(app, "live_pick", "Pune")           # pick an Indian place instead of typing
-    assert not any("Couldn't" in e.value for e in app.error)
-    assert any("Historical context for Pune" in c.value for c in app.caption)
+def test_pollutant_trend_summary_compares_next_day_to_current():
+    current = pd.Series({"PM2.5": 20.0, "PM10": 40.0, "NO2": 10.0,
+                         "SO2": 5.0, "O3": 30.0, "CO": 0.4})
+    forecast = pd.DataFrame({
+        "time": pd.to_datetime(["2026-10-20 12:00", "2026-10-20 18:00"]),
+        "PM2.5": [30.0, 32.0], "PM10": [32.0, 34.0], "NO2": [10.0, 10.0],
+        "SO2": [5.0, 5.0], "O3": [30.0, 30.0], "CO": [0.4, 0.4],
+    })
+    trends = live_data.pollutant_trend_summary(current, forecast).set_index("Pollutant")
+    assert trends.loc["PM2.5", "Trend"] == "Rising"
+    assert trends.loc["PM10", "Trend"] == "Falling"
+    assert trends.loc["CO", "Unit"] == "mg/m³"

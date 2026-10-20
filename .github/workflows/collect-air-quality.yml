@@ -1,0 +1,36 @@
+name: Collect air-quality forecasts
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: air-quality-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Collect configured locations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AQI_COLLECTOR_LOCATIONS: ${{ vars.AQI_COLLECTOR_LOCATIONS }}
+          AQI_SMTP_HOST: ${{ secrets.AQI_SMTP_HOST }}
+          AQI_SMTP_PORT: ${{ secrets.AQI_SMTP_PORT }}
+          AQI_SMTP_USER: ${{ secrets.AQI_SMTP_USER }}
+          AQI_SMTP_PASSWORD: ${{ secrets.AQI_SMTP_PASSWORD }}
+          AQI_ALERT_FROM: ${{ secrets.AQI_ALERT_FROM }}
+          CPCB_AQI_URL: ${{ secrets.CPCB_AQI_URL }}
+        run: python collector.py

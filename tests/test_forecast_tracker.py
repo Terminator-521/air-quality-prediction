@@ -1,10 +1,11 @@
 import pandas as pd
 
 import forecast_tracker
+import database
 
 
 def test_tracker_records_and_summarises_matured_forecasts(tmp_path, monkeypatch):
-    monkeypatch.setattr(forecast_tracker, "FORECAST_TRACKER_PATH", tmp_path / "tracker.sqlite")
+    monkeypatch.setattr(database, "AIR_QUALITY_DB_PATH", tmp_path / "tracker.sqlite")
     location = {"latitude": 28.6139, "longitude": 77.2090}
     forecast = pd.DataFrame({
         "time": pd.to_datetime(["2026-10-20 12:00"]),
